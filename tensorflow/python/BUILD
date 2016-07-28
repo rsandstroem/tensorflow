@@ -157,10 +157,8 @@ py_test(
 
 cc_library(
     name = "python_op_gen",
-    srcs = [
-        "framework/python_op_gen.cc",
-        "framework/python_op_gen.h",
-    ],
+    srcs = ["framework/python_op_gen.cc"],
+    hdrs = ["framework/python_op_gen.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//tensorflow/core:framework",
@@ -407,6 +405,20 @@ py_test(
 )
 
 py_test(
+    name = "framework_random_seed_test",
+    size = "small",
+    srcs = ["framework/random_seed_test.py"],
+    main = "framework/random_seed_test.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":framework_test_lib",
+        ":ops",
+        ":platform_test",
+        "//tensorflow:tensorflow_py",
+    ],
+)
+
+py_test(
     name = "framework_tensor_shape_div_test",
     size = "small",
     srcs = ["framework/tensor_shape_div_test.py"],
@@ -540,14 +552,23 @@ tf_gen_op_wrapper_py(
 tf_gen_op_wrapper_py(
     name = "data_flow_ops",
     hidden = [
+        "Barrier",
+        "BarrierClose",
+        "BarrierIncompleteSize",
+        "BarrierInsertMany",
+        "BarrierReadySize",
+        "BarrierTakeMany",
+        "PriorityQueue",
         "FIFOQueue",
         "HashTable",
         "InitializeTable",
         "InitializeTableFromTextFile",
+        "LookupTableExport",
         "LookupTableFind",
         "LookupTableInsert",
         "LookupTableSize",
         "MutableHashTable",
+        "MutableHashTableOfTensors",
         "Mutex",
         "MutexAcquire",
         "MutexRelease",
@@ -637,6 +658,7 @@ tf_gen_op_wrapper_py(
         "MergeSummary",
         "Print",
         "ScalarSummary",
+        "TensorSummary",
     ],
     require_shape_functions = True,
 )
@@ -661,6 +683,8 @@ tf_gen_op_wrapper_py(
         "MatMul",
         "Sigmoid",
         "Tanh",
+        "SigmoidGrad",
+        "TanhGrad",
     ],
     require_shape_functions = True,
 )
@@ -709,6 +733,7 @@ tf_gen_op_wrapper_py(
         "RandomUniformInt",
         "RandomShuffle",
         "RandomStandardNormal",
+        "ParameterizedTruncatedNormal",
         "TruncatedNormal",
     ],
     require_shape_functions = True,
@@ -718,6 +743,7 @@ tf_gen_op_wrapper_py(
     name = "script_ops",
     hidden = [
         "PyFunc",
+        "PyFuncStateless",
     ],
     require_shape_functions = True,
 )
@@ -828,6 +854,7 @@ py_library(
         "ops/state_grad.py",
         "ops/state_ops.py",
         "ops/string_ops.py",
+        "ops/summary_ops.py",
         "ops/template.py",
         "ops/tensor_array_grad.py",
         "ops/tensor_array_ops.py",
@@ -904,7 +931,10 @@ py_library(
 
 py_library(
     name = "util",
-    srcs = glob(["util/**/*.py"]),
+    srcs = glob(
+        ["util/**/*.py"],
+        exclude = ["util/example_parser*"],
+    ),
     srcs_version = "PY2AND3",
     deps = ["@protobuf//:protobuf_python"],
 )
@@ -918,6 +948,18 @@ py_test(
     deps = [
         ":util",
         "//tensorflow:tensorflow_py",
+    ],
+)
+
+py_library(
+    name = "util_example_parser_configuration",
+    srcs = ["util/example_parser_configuration.py"],
+    srcs_version = "PY2AND3",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//tensorflow:tensorflow_py",
+        "//tensorflow/core:protos_all_py",
+        "//tensorflow/python:platform",
     ],
 )
 
@@ -948,6 +990,21 @@ py_test(
         ":compare_test_proto_py",
         ":platform_test",
         ":util",
+    ],
+)
+
+py_test(
+    name = "util_example_parser_configuration_test",
+    size = "small",
+    srcs = ["util/example_parser_configuration_test.py"],
+    main = "util/example_parser_configuration_test.py",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":framework_test_lib",
+        ":platform_test",
+        ":util_example_parser_configuration",
+        "//tensorflow:tensorflow_py",
+        "//tensorflow/python:platform",
     ],
 )
 
@@ -1029,11 +1086,11 @@ tf_py_wrap_cc(
         "framework/python_op_gen.i",
         "lib/core/py_func.i",
         "lib/core/strings.i",
+        "lib/io/file_io.i",
         "lib/io/py_record_reader.i",
         "lib/io/py_record_writer.i",
         "platform/base.i",
         "platform/numpy.i",
-        "training/saver_io.i",
         "training/server_lib.i",
         "util/port.i",
         "util/py_checkpoint_reader.i",
@@ -1141,6 +1198,17 @@ py_test(
     ],
 )
 
+py_test(
+    name = "file_io_test",
+    size = "small",
+    srcs = ["lib/io/file_io_test.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":lib",
+        "//tensorflow:tensorflow_py",
+    ],
+)
+
 cuda_py_tests(
     name = "op_tests",
     size = "small",
@@ -1149,12 +1217,19 @@ cuda_py_tests(
         exclude = [
             "ops/image_ops_test.py",
             "ops/nn_batchnorm_test.py",
-            "ops/nn_conv_test.py",
             "ops/nn_test.py",
             "ops/nn_xent_test.py",
             "ops/op_def_library_test.py",
+            "ops/special_math_ops_test.py",
         ],
     ),
+)
+
+cuda_py_test(
+    name = "special_math_ops_test",
+    size = "small",
+    srcs = ["ops/special_math_ops_test.py"],
+    tags = ["notsan"],
 )
 
 cuda_py_tests(
@@ -1162,7 +1237,6 @@ cuda_py_tests(
     size = "medium",
     srcs = [
         "ops/nn_batchnorm_test.py",
-        "ops/nn_conv_test.py",
         "ops/nn_test.py",
         "ops/nn_xent_test.py",
     ],
@@ -1178,6 +1252,7 @@ cuda_py_tests(
         "//tensorflow/core:image_testdata",
     ],
     shard_count = 5,
+    tags = ["notsan"],
 )
 
 cuda_py_tests(
@@ -1190,11 +1265,22 @@ cuda_py_tests(
             "training/server_lib_test.py",
             "training/session_manager_test.py",
             "training/supervisor_test.py",
+            "training/saver_test.py",
         ],
     ),
     additional_deps = [
         ":training",
     ],
+)
+
+cuda_py_test(
+    name = "saver_test",
+    size = "small",
+    srcs = ["training/saver_test.py"],
+    additional_deps = [
+        ":training",
+    ],
+    tags = ["notsan"],  # http://b/30379628
 )
 
 cuda_py_test(
@@ -1239,6 +1325,7 @@ py_library(
     deps = [
         ":client",
         ":framework",
+        ":ops",
         ":protos_all_py",
         ":pywrap_tensorflow",
         ":util",

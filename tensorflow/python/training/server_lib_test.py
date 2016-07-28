@@ -250,11 +250,50 @@ class GrpcServerTest(tf.test.TestCase):
     sess.close()
     blocking_thread.join()
 
+  def testSetConfiguration(self):
+    config = tf.ConfigProto(
+        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.1))
+
+    # Configure a server using the default local server options.
+    server = tf.train.Server.create_local_server(config=config, start=False)
+    self.assertEqual(
+        0.1,
+        server.server_def.default_session_config
+        .gpu_options.per_process_gpu_memory_fraction)
+
+    # Configure a server using an explicit ServerDefd with an
+    # overridden config.
+    cluster_def = tf.train.ClusterSpec(
+        {"localhost": ["localhost:0"]}).as_cluster_def()
+    server_def = tf.train.ServerDef(
+        cluster=cluster_def, job_name="localhost", task_index=0,
+        protocol="grpc")
+    server = tf.train.Server(server_def, config=config, start=False)
+    self.assertEqual(
+        0.1,
+        server.server_def.default_session_config
+        .gpu_options.per_process_gpu_memory_fraction)
+
   def testInvalidHostname(self):
     with self.assertRaisesRegexp(tf.errors.InvalidArgumentError, "port"):
       _ = tf.train.Server({"local": ["localhost"]},
                           job_name="local",
                           task_index=0)
+
+  def testInteractiveSession(self):
+    server = tf.train.Server.create_local_server()
+    # TODO(b/29900832): Remove this assertion when the bug is fixed.
+    a = tf.constant(1.0)
+    with self.assertRaisesRegexp(tf.errors.UnimplementedError, "pruned"):
+      sess = tf.InteractiveSession(target=server.target)
+      sess.run(a)
+
+    # TODO(b/29900832): The following code fails (without the unimplemented
+    # check in `tensorflow::MasterSession`):
+    # a = tf.constant(1.0)
+    # b = tf.constant(2.0)
+    # self.assertEqual(1.0, sess.run(a))
+    # self.assertEqual(2.0, sess.run(b))
 
 
 class ServerDefTest(tf.test.TestCase):

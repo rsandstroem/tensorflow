@@ -1,4 +1,3 @@
-# pylint: disable=g-bad-file-header
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -131,6 +130,33 @@ class TensorFlowDataFrame(df.DataFrame):
         coord.request_stop()
         coord.join(threads)
 
+  def select_rows(self, boolean_series):
+    """Returns a `DataFrame` with only the rows indicated by `boolean_series`.
+
+    Note that batches may no longer have consistent size after calling
+    `select_rows`, so the new `DataFrame` may need to be rebatched.
+    For example:
+    '''
+    filtered_df = df.select_rows(df["country"] == "jp").batch(64)
+    '''
+
+    Args:
+      boolean_series: a `Series` that evaluates to a boolean `Tensor`.
+
+    Returns:
+      A new `DataFrame` with the same columns as `self`, but selecting only the
+      rows where `boolean_series` evaluated to `True`.
+    """
+    result = type(self)()
+    for key, col in self._columns.items():
+      try:
+        result[key] = col.select_rows(boolean_series)
+      except AttributeError as e:
+        raise NotImplementedError((
+            "The select_rows method is not implemented for Series type {}. "
+            "Original error: {}").format(type(col), e))
+    return result
+
   def run_once(self):
     """Creates a new 'Graph` and `Session` and runs a single batch.
 
@@ -185,7 +211,7 @@ class TensorFlowDataFrame(df.DataFrame):
                      column_names, num_epochs, num_threads, enqueue_size,
                      batch_size, queue_capacity, min_after_dequeue, shuffle,
                      seed):
-    """Create a `DataFrame` from `tensorflow.Example`s.
+    """Create a `DataFrame` from CSV files.
 
     If `has_header` is false, then `column_names` must be specified. If
     `has_header` is true and `column_names` are specified, then `column_names`
@@ -211,7 +237,7 @@ class TensorFlowDataFrame(df.DataFrame):
 
     Returns:
       A `DataFrame` that has columns corresponding to `features` and is filled
-      with `Example`s from `filepatterns`.
+      with examples from `filepatterns`.
 
     Raises:
       ValueError: no files match `filepatterns`.
@@ -269,7 +295,7 @@ class TensorFlowDataFrame(df.DataFrame):
                min_after_dequeue=None,
                shuffle=True,
                seed=None):
-    """Create a `DataFrame` from `tensorflow.Example`s.
+    """Create a `DataFrame` from CSV files.
 
     If `has_header` is false, then `column_names` must be specified. If
     `has_header` is true and `column_names` are specified, then `column_names`
@@ -294,7 +320,7 @@ class TensorFlowDataFrame(df.DataFrame):
 
     Returns:
       A `DataFrame` that has columns corresponding to `features` and is filled
-      with `Example`s from `filepatterns`.
+      with examples from `filepatterns`.
 
     Raises:
       ValueError: no files match `filepatterns`.
@@ -324,7 +350,7 @@ class TensorFlowDataFrame(df.DataFrame):
                                  min_after_dequeue=None,
                                  shuffle=True,
                                  seed=None):
-    """Create a `DataFrame` from `tensorflow.Example`s.
+    """Create a `DataFrame` from CSV files, given a feature_spec.
 
     If `has_header` is false, then `column_names` must be specified. If
     `has_header` is true and `column_names` are specified, then `column_names`
@@ -350,7 +376,7 @@ class TensorFlowDataFrame(df.DataFrame):
 
     Returns:
       A `DataFrame` that has columns corresponding to `features` and is filled
-      with `Example`s from `filepatterns`.
+      with examples from `filepatterns`.
 
     Raises:
       ValueError: no files match `filepatterns`.
